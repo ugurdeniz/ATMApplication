@@ -18,7 +18,7 @@ namespace Dal.Migrations
 
             context.ATMMachines.AddOrUpdate(
               a => a.Id,
-              new ATMMachine { Location = "Ýstanbul", BesTL = 50, ElliTL = 30, IkiyuzTL = 10, OnTL = 40, YirmiTL = 20,YuzTL=10,TotalMoney=4750 }
+              new ATMMachine { Location = "Ýstanbul", BesTL = 50, ElliTL = 30, IkiyuzTL = 10, OnTL = 40, YirmiTL = 20,YuzTL=10,BirTL=5,TotalMoney=4755 }
             );
 
             context.Customers.AddOrUpdate(

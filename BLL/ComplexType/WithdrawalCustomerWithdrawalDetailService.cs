@@ -22,8 +22,8 @@ namespace BLL.ComplexType
         IRepository<WithdrawalDetail> _wdr;
         IRepository<ATMMachine> _amr;
 
-        List<byte> _notes;
-        short[] _noteCounter;
+        List<int> _banknotes;
+        List<short> _noteCounter;
 
         public WithdrawalCustomerWithdrawalDetailService(IUnitOfWork uow)
         {
@@ -32,8 +32,8 @@ namespace BLL.ComplexType
             _cr = uow.GetRepository<Customer>();
             _wdr = uow.GetRepository<WithdrawalDetail>();
             _amr = uow.GetRepository<ATMMachine>();
-            _notes = new List<byte> { 200, 100, 50, 20, 10, 5 };
-            _noteCounter = new short[5];
+            _banknotes = new List<int>();
+            _noteCounter = new List<short>();
         }
         /// <summary>
         /// Eşit/Yaklaşık sayıda banknot kullanarak para çekme işlemini gerçekleştiren method
@@ -49,6 +49,46 @@ namespace BLL.ComplexType
             throw new NotImplementedException();
         }
 
+        public static void makeChangeLimitedCoins(ref List<int> _banknotes, ref List<short> _notecounter, int withdrawQuantity)
+        {
+            int[] C = new int[withdrawQuantity + 1];
+            C[0] = 0;
+
+            int len = _banknotes.Count;
+            int[,] track = new int[withdrawQuantity + 1, len];
+
+            for (int i = 0; i < len; i++)
+            {
+                track[0, i] = _notecounter[i];
+            }
+            int[] denom = new int[withdrawQuantity + 1];
+            for (int j = 1; j <= withdrawQuantity; j++)
+            {
+                C[j] = int.MaxValue;
+                for (int k = 0; k < len; k++)
+                {
+                    if (j >= _banknotes[k] && (C[j - _banknotes[k]] < int.MaxValue) && (track[j - _banknotes[k], k] > 0))
+                    {
+                        //C[j] = C[j] > 1+C[j-_banknotes[k]] ? 1+C[j-_banknotes[k]] : C[j];
+                        if ((C[j] > 1 + C[j - _banknotes[k]]))
+                        {
+                            C[j] = 1 + C[j - _banknotes[k]];
+                            denom[j] = _banknotes[k];
+                            track[j, k] = track[j - _banknotes[k], k] - 1;
+                        }
+                        else
+                        {
+                            track[j, k] = track[j - _banknotes[k], k];
+                        }
+                    }
+                    else if (j < _banknotes[k])
+                    {
+                        track[j, k] = track[0, k];
+                    }
+                }
+            }
+
+        }
         /// <summary>
         /// En az sayıda banknot kullanarak para çekme işlemini gerçekleştiren method
         /// </summary>
@@ -79,6 +119,50 @@ namespace BLL.ComplexType
             //ATM bilgileri alındı
             var atmMachine = _amr.Get(x => x.Id == machineId);
 
+            #region Veritabanındaki banknot tipi ve sayıları daha sonra işlem yapmak üzere aktarılıyor
+            if (atmMachine.BirTL > 0)
+            {
+                _banknotes.Add(1);
+                _noteCounter.Add(atmMachine.BirTL);
+            }
+
+            if (atmMachine.BesTL > 0)
+            {
+                _banknotes.Add(5);
+                _noteCounter.Add(atmMachine.BesTL);
+            }
+
+            if (atmMachine.OnTL > 0)
+            {
+                _banknotes.Add(10);
+                _noteCounter.Add(atmMachine.OnTL);
+            }
+
+            if (atmMachine.YirmiTL > 0)
+            {
+                _banknotes.Add(20);
+                _noteCounter.Add(atmMachine.YirmiTL);
+            }
+
+            if (atmMachine.ElliTL > 0)
+            {
+                _banknotes.Add(50);
+                _noteCounter.Add(atmMachine.ElliTL);
+            }
+
+            if (atmMachine.YuzTL > 0)
+            {
+                _banknotes.Add(100);
+                _noteCounter.Add(atmMachine.YuzTL);
+            }
+
+            if (atmMachine.IkiyuzTL > 0)
+            {
+                _banknotes.Add(200);
+                _noteCounter.Add(atmMachine.IkiyuzTL);
+            }
+            #endregion
+
             //Hata kontrolleri
             if (atmMachine.TotalMoney < withdrawQuantity)
             {
@@ -86,19 +170,7 @@ namespace BLL.ComplexType
             }
             else
             {
-                if (withdrawQuantity < 5)
-                {
-                    return new ServiceResult(ProcessStateEnum.Warning, "Yalnızca 5 ve katları şeklinde çekim yapılabilir");
-                }
-
-                for (int i = 0; i < 5; i++)
-                {
-                    if (withdrawQuantity >= _notes[i])
-                    {
-                        _noteCounter[i] = (short)(withdrawQuantity / _notes[i]);
-                        withdrawQuantity = (short)(withdrawQuantity - _noteCounter[i] * _notes[i]);
-                    }
-                }
+                makeChangeLimitedCoins(ref _banknotes, ref _noteCounter, withdrawQuantity);
 
                 //Çekilen para bilgisinin veritabanına kayıt işlemi
                 try
@@ -111,14 +183,14 @@ namespace BLL.ComplexType
                     withdrawal.Total = withdrawQuantity;
                     _wr.Add(withdrawal);
 
-                    for (int i = 0; i < _notes.Count; i++)
+                    for (int i = 0; i < _banknotes.Count; i++)
                     {
                         if (_noteCounter[i] != 0) //Verilecek banknot varsa veritabanına kaydeder
                         {
                             WithdrawalDetail withdrawalDetail = new WithdrawalDetail()
                             {
                                 Count = (byte)(_noteCounter[i]),
-                                MoneyType = _notes[i],
+                                MoneyType = (byte)_banknotes[i],
                                 WithdrawalId = withdrawal.Id
                             };
                             _wdr.Add(withdrawalDetail);

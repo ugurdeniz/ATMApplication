@@ -19,6 +19,7 @@ namespace Entity
 
         public string Location { get; set; }
         [Column(name:"ToplamPara",TypeName ="smallint")]
+        public short BirTL { get; set; }
         public short BesTL { get; set; }
         public short OnTL { get; set; }
         public short YirmiTL { get; set; }
